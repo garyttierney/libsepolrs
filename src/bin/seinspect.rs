@@ -6,6 +6,7 @@ extern crate sepolrs;
 use clap::ArgMatches;
 use itertools::Itertools;
 use sepolrs::policydb::feature::Feature;
+use sepolrs::policydb::symtable::Symbol;
 use sepolrs::policydb::Policy;
 use sepolrs::policydb::PolicyType;
 
@@ -21,9 +22,10 @@ fn main() {
     let mut app = clap_app!(seinspect =>
         (version: "1.0")
         (about: "A tool used to inspect and analyze SELinux policy")
-        (@arg POLICY: -p --policy +takes_value "Use a custom policy path")
+        (@arg POLICY: -p --policy +takes_value "Override the path to the binary policy file")
         (@subcommand info =>
-            (about: "show high-level policy information")
+            (about: "Show high-level policy information")
+            (@arg SHOW_COMMONS: --common "Show common security classes listed in the policy")
         )
     );
 
@@ -41,27 +43,44 @@ fn main() {
     };
 }
 
-fn show_policy_info(policy: &Policy, _args: &ArgMatches) {
-    let ty_str = match policy.ty() {
-        &PolicyType::Kernel(ref platform) => format!("{:#?} Kernel policy", platform),
-        &PolicyType::Module {
-            is_base_module: _,
-            ref name,
-            ref version,
-        } => format!("Modular policy, {} v{}", name, version),
-    };
+fn show_policy_info(policy: &Policy, args: &ArgMatches) {
+    if args.is_present("SHOW_COMMONS") {
+        show_policy_common_info(&policy)
+    } else {
+        let ty_str = match policy.ty() {
+            &PolicyType::Kernel(ref platform) => format!("{:#?} Kernel policy", platform),
+            &PolicyType::Module {
+                is_base_module: _,
+                ref name,
+                ref version,
+            } => format!("Modular policy, {} v{}", name, version),
+        };
 
-    println!("Policy type: {}", ty_str);
-    println!("Policy version: {}", policy.version());
+        println!("Policy type: {}", ty_str);
+        println!("Policy version: {}", policy.version());
 
-    if policy.profile().supports(Feature::PolicyCapabilities) {
-        let polcaps_str = policy
-            .polcaps()
+        if policy.profile().supports(Feature::PolicyCapabilities) {
+            let polcaps_str = policy
+                .polcaps()
+                .all()
+                .iter()
+                .map(|p| p.to_string())
+                .join(", ");
+
+            println!("Policy capabilities: {}", polcaps_str);
+        }
+    }
+}
+
+fn show_policy_common_info(policy: &Policy) {
+    for common in policy.common_classes().all() {
+        let common_name = common.name();
+        let permission_names = common
+            .permissions()
             .all()
-            .iter()
-            .map(|p| p.to_string())
-            .join(", ");
+            .map(|p| format!("\t{}", p.name()))
+            .join(",\n");
 
-        println!("Policy capabilities: {}", polcaps_str);
+        println!("{} {{ \n {} \n}}", common_name, permission_names);
     }
 }
