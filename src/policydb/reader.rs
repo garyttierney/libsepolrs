@@ -1,12 +1,13 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use croaring::Bitmap;
-
+use policydb::class::Common;
 use policydb::constants::*;
 use policydb::feature::Feature;
 use policydb::polcap::{PolicyCapability, PolicyCapabilitySet};
 use policydb::profile::CompatibilityProfile;
+use policydb::symtable::Symbol;
+use policydb::symtable::SymbolTable;
 use policydb::{Policy, PolicyTargetPlatform, PolicyType};
-
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IoError;
@@ -87,6 +88,35 @@ impl<R: Read> Reader<R> {
         Ok(bitmap)
     }
 
+    pub fn read_common(&mut self) -> Result<Common, ReadError> {
+        unimplemented!()
+    }
+
+    pub fn read_permission(&mut self) {}
+
+    pub fn read_bare_symbol_table<S>(&mut self, nel: usize) -> Result<SymbolTable<S>, ReadError>
+    where
+        S: Symbol,
+    {
+        let mut table = SymbolTable::with_capacity(nel);
+
+        for el in 0..nel {
+            table.insert(S::decode(self)?);
+        }
+
+        Ok(table)
+    }
+
+    pub fn read_symbol_table<S>(&mut self) -> Result<SymbolTable<S>, ReadError>
+    where
+        S: Symbol,
+    {
+        let _num_primary_names = self.read_u32()?;
+        let num_elements = self.read_u32()?;
+
+        self.read_bare_symbol_table(num_elements as usize)
+    }
+
     pub fn read_policy(&mut self) -> Result<Policy, ReadError> {
         let ty_opcode = self.read_u32()?;
         let platform_str_len = self.read_u32()?;
@@ -132,19 +162,14 @@ impl<R: Read> Reader<R> {
             None
         };
 
-        let mut symtab_info = vec![];
-        for symtab_id in 0..num_sym_tables {
-            let num_primary_names = self.read_u32()?;
-            let num_elements = self.read_u32()?;
-
-            symtab_info.push((num_primary_names, num_elements));
-        }
+        let common_classes: SymbolTable<Common> = self.read_symbol_table()?;
 
         Ok(Policy {
             ty,
             version,
             polcaps,
             profile,
+            common_classes,
         })
     }
 

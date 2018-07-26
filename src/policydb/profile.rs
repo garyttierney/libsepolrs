@@ -35,6 +35,10 @@ impl CompatibilityProfile {
                 if version > POLICYDB_VERSION_POLCAP {
                     feature_set.insert(Feature::PolicyCapabilities);
                 }
+
+                if version > POLICYDB_VERSION_PERMISSIVE {
+                    feature_set.insert(Feature::PermissiveTypes);
+                }
             }
             &PolicyType::Kernel(PolicyTargetPlatform::Xen) => {
                 return None;

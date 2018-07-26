@@ -1,11 +1,15 @@
+pub mod class;
 pub mod feature;
 pub mod polcap;
 pub mod profile;
 pub mod reader;
+pub mod symtable;
 
+use policydb::class::Common;
 use policydb::polcap::PolicyCapabilitySet;
 use policydb::profile::CompatibilityProfile;
 pub use policydb::reader::Reader;
+use policydb::symtable::SymbolTable;
 
 pub(crate) mod constants {
     pub(crate) const PLATFORM_SELINUX: &str = "SE Linux";
@@ -25,15 +29,19 @@ pub(crate) mod constants {
 
 pub enum PolicyError {}
 
-#[derive(Debug)]
 pub struct Policy {
     ty: PolicyType,
     version: u32,
     polcaps: PolicyCapabilitySet,
     profile: CompatibilityProfile,
+    common_classes: SymbolTable<Common>,
 }
 
 impl Policy {
+    pub fn common_classes(&self) -> &SymbolTable<Common> {
+        &self.common_classes
+    }
+
     pub fn profile(&self) -> &CompatibilityProfile {
         &self.profile
     }
