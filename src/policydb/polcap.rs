@@ -1,3 +1,10 @@
+use croaring::Bitmap;
+use policydb::profile::CompatibilityProfile;
+use policydb::profile::Feature;
+use policydb::reader::ReadError;
+use policydb::PolicyObject;
+use policydb::Reader;
+use std::io::Read;
 use std::str::FromStr;
 
 macro_rules! polcaps (
@@ -87,6 +94,28 @@ impl PolicyCapabilitySet {
     pub fn disable(&mut self, polcap: PolicyCapability) {
         if let Some(index) = self.polcaps.iter().position(|p| p == &polcap) {
             self.polcaps.remove(index);
+        }
+    }
+}
+
+impl PolicyObject for PolicyCapabilitySet {
+    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+        let profile = reader.profile();
+
+        if profile.supports(Feature::PolicyCapabilities) {
+            let bitmap: Bitmap = reader.read_object()?;
+            let mut polcaps = vec![];
+
+            for polcap in bitmap.iter().map(|f| PolicyCapability::from_id(f)) {
+                match polcap {
+                    Some(p) => polcaps.push(p),
+                    None => return Err(ReadError::InvalidPolicyCapability),
+                }
+            }
+
+            Ok(PolicyCapabilitySet::new(polcaps))
+        } else {
+            Ok(PolicyCapabilitySet::empty())
         }
     }
 }

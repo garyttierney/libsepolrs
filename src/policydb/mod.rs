@@ -1,15 +1,25 @@
-pub mod class;
-pub mod feature;
-pub mod polcap;
-pub mod profile;
-pub mod reader;
-pub mod symtable;
-
+use policydb::class::Class;
 use policydb::class::Common;
 use policydb::polcap::PolicyCapabilitySet;
 use policydb::profile::CompatibilityProfile;
+use policydb::reader::ReadError;
 pub use policydb::reader::Reader;
+use policydb::role::Role;
 use policydb::symtable::SymbolTable;
+use policydb::ty::Type;
+use std::io::Read;
+
+pub mod bitmap;
+pub mod class;
+pub mod cons;
+pub mod mls;
+pub mod polcap;
+pub mod profile;
+pub mod reader;
+pub mod role;
+pub mod symtable;
+pub mod ty;
+pub mod user;
 
 pub(crate) mod constants {
     pub(crate) const PLATFORM_SELINUX: &str = "SE Linux";
@@ -29,12 +39,33 @@ pub(crate) mod constants {
 
 pub enum PolicyError {}
 
+#[derive(Debug)]
 pub struct Policy {
-    ty: PolicyType,
     version: u32,
     polcaps: PolicyCapabilitySet,
     profile: CompatibilityProfile,
     common_classes: SymbolTable<Common>,
+    classes: SymbolTable<Class>,
+    roles: SymbolTable<Role>,
+    types: SymbolTable<Type>,
+}
+
+pub trait PolicyObject: Sized {
+    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError>;
+
+    fn decode_collection<R: Read>(
+        reader: &mut Reader<R>,
+        profile: &CompatibilityProfile,
+        count: usize,
+    ) -> Result<Vec<Self>, ReadError> {
+        let mut collection: Vec<Self> = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            collection.push(Self::decode(reader)?);
+        }
+
+        Ok(collection)
+    }
 }
 
 impl Policy {
@@ -51,7 +82,7 @@ impl Policy {
     }
 
     pub fn ty(&self) -> &PolicyType {
-        &self.ty
+        &self.profile.ty()
     }
 
     pub fn version(&self) -> u32 {
@@ -59,13 +90,13 @@ impl Policy {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PolicyTargetPlatform {
     SELinux,
     Xen,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PolicyType {
     Kernel(PolicyTargetPlatform),
     Module {
@@ -73,6 +104,15 @@ pub enum PolicyType {
         name: String,
         version: String,
     },
+}
+
+impl PolicyType {
+    pub fn is_kernel_policy(&self) -> bool {
+        match *self {
+            PolicyType::Kernel(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

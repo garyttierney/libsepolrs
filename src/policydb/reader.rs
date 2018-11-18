@@ -1,12 +1,24 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use croaring::Bitmap;
+use policydb::class::Class;
 use policydb::class::Common;
+use policydb::cons::constants;
+use policydb::cons::BinaryOp;
+use policydb::cons::Constraint;
+use policydb::cons::ConstraintExpression;
+use policydb::cons::ConstraintExpressionKind;
+use policydb::cons::UnaryOp;
 use policydb::constants::*;
-use policydb::feature::Feature;
 use policydb::polcap::{PolicyCapability, PolicyCapabilitySet};
 use policydb::profile::CompatibilityProfile;
+use policydb::profile::Feature;
+use policydb::role::Role;
 use policydb::symtable::Symbol;
 use policydb::symtable::SymbolTable;
+use policydb::ty::Type;
+use policydb::ty::TypeSet;
+use policydb::user::User;
+use policydb::PolicyObject;
 use policydb::{Policy, PolicyTargetPlatform, PolicyType};
 use std::error::Error;
 use std::fmt;
@@ -17,6 +29,7 @@ use std::str;
 /// Decodes the policy representation from a binary format.
 pub struct Reader<R: Read> {
     buf: R,
+    profile: Option<CompatibilityProfile>,
 }
 
 #[derive(Debug)]
@@ -48,7 +61,7 @@ impl fmt::Display for ReadError {
 
 impl<R: Read> Reader<R> {
     pub fn new(buf: R) -> Self {
-        Reader { buf }
+        Reader { buf, profile: None }
     }
 
     pub fn read_u32(&mut self) -> Result<u32, IoError> {
@@ -67,32 +80,6 @@ impl<R: Read> Reader<R> {
 
         Ok(value)
     }
-
-    pub fn read_ebitmap(&mut self) -> Result<Bitmap, ReadError> {
-        let map_size = self.read_u32()?;
-        let high_bit = self.read_u32()?;
-        let map_count = self.read_u32()?;
-        let mut bitmap = Bitmap::create_with_capacity(map_count);
-
-        for map_idx in 0..map_count {
-            let start_bit = self.read_u32()?;
-            let map = self.read_u64()?;
-
-            for bit in 0..64 {
-                if (1 << bit) & map != 0 {
-                    bitmap.add(start_bit + bit as u32);
-                }
-            }
-        }
-
-        Ok(bitmap)
-    }
-
-    pub fn read_common(&mut self) -> Result<Common, ReadError> {
-        unimplemented!()
-    }
-
-    pub fn read_permission(&mut self) {}
 
     pub fn read_bare_symbol_table<S>(&mut self, nel: usize) -> Result<SymbolTable<S>, ReadError>
     where
@@ -113,11 +100,27 @@ impl<R: Read> Reader<R> {
     {
         let _num_primary_names = self.read_u32()?;
         let num_elements = self.read_u32()?;
+        let profile = self.profile();
 
         self.read_bare_symbol_table(num_elements as usize)
     }
 
-    pub fn read_policy(&mut self) -> Result<Policy, ReadError> {
+    pub fn read_object<O: PolicyObject>(&mut self) -> Result<O, ReadError> {
+        O::decode(self)
+    }
+
+    pub fn read_objects<O: PolicyObject>(&mut self, count: usize) -> Result<Vec<O>, ReadError> {
+        let profile = self.profile();
+        let mut list = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            list.push(O::decode(self)?);
+        }
+
+        Ok(list)
+    }
+
+    pub fn read_policy(mut self) -> Result<Policy, ReadError> {
         let ty_opcode = self.read_u32()?;
         let platform_str_len = self.read_u32()?;
         let platform = self.read_string(platform_str_len as usize)?;
@@ -152,45 +155,35 @@ impl<R: Read> Reader<R> {
             _ => return Err(ReadError::InvalidMagicCode(ty_opcode)),
         };
 
-        let profile =
-            CompatibilityProfile::find(&ty, version).ok_or(ReadError::InvalidVersion(version))?;
+        self.profile = Some(CompatibilityProfile::new(ty, version));
 
-        let polcaps = self.read_policy_capabilities(&profile)?;
-        let permissive_type_map = if profile.supports(Feature::PermissiveTypes) {
-            Some(self.read_ebitmap()?)
-        } else {
-            None
-        };
+        let polcaps: PolicyCapabilitySet = self.read_object()?;
+        let permissive_type_map: Option<Bitmap> =
+            if self.profile().supports(Feature::PermissiveTypes) {
+                Some(self.read_object()?)
+            } else {
+                None
+            };
 
         let common_classes: SymbolTable<Common> = self.read_symbol_table()?;
+        let classes: SymbolTable<Class> = self.read_symbol_table()?;
+        let roles: SymbolTable<Role> = self.read_symbol_table()?;
+        let types: SymbolTable<Type> = self.read_symbol_table()?;
 
         Ok(Policy {
-            ty,
             version,
             polcaps,
-            profile,
+            profile: self.profile.expect("uninitialized"),
             common_classes,
+            classes,
+            roles,
+            types,
         })
     }
 
-    pub fn read_policy_capabilities(
-        &mut self,
-        profile: &CompatibilityProfile,
-    ) -> Result<PolicyCapabilitySet, ReadError> {
-        if profile.supports(Feature::PolicyCapabilities) {
-            let bitmap = self.read_ebitmap()?;
-            let mut polcaps = vec![];
-
-            for polcap in bitmap.iter().map(|f| PolicyCapability::from_id(f)) {
-                match polcap {
-                    Some(p) => polcaps.push(p),
-                    None => return Err(ReadError::InvalidPolicyCapability),
-                }
-            }
-
-            Ok(PolicyCapabilitySet::new(polcaps))
-        } else {
-            Ok(PolicyCapabilitySet::empty())
-        }
+    pub fn profile(&self) -> &CompatibilityProfile {
+        self.profile
+            .as_ref()
+            .expect("Compatibility profile is uninitialized")
     }
 }

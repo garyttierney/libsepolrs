@@ -1,17 +1,15 @@
+use policydb::profile::CompatibilityProfile;
 use policydb::reader::ReadError;
+use policydb::PolicyObject;
 use policydb::Reader;
 use std::collections::btree_map::Values;
 use std::collections::BTreeMap;
 use std::io::Read;
 
-pub trait Symbol: Sized {
+pub trait Symbol: PolicyObject {
     fn id(&self) -> u32;
 
     fn name(&self) -> &str;
-
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError>;
-
-    //  fn encode(writer: &mut writer) -> Result<Self, WriteError>;
 }
 
 #[derive(Debug)]
