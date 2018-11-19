@@ -1,5 +1,8 @@
 use policydb::class::Class;
 use policydb::class::Common;
+use policydb::conditional::Boolean;
+use policydb::mls::Category;
+use policydb::mls::Sensitivity;
 use policydb::polcap::PolicyCapabilitySet;
 use policydb::profile::CompatibilityProfile;
 use policydb::reader::ReadError;
@@ -7,10 +10,14 @@ pub use policydb::reader::Reader;
 use policydb::role::Role;
 use policydb::symtable::SymbolTable;
 use policydb::ty::Type;
+use policydb::user::User;
 use std::io::Read;
+use policydb::avtab::AccessVectorTable;
 
+pub mod avtab;
 pub mod bitmap;
 pub mod class;
+pub mod conditional;
 pub mod cons;
 pub mod mls;
 pub mod polcap;
@@ -44,10 +51,15 @@ pub struct Policy {
     version: u32,
     polcaps: PolicyCapabilitySet,
     profile: CompatibilityProfile,
+    avtab: AccessVectorTable,
+    booleans: SymbolTable<Boolean>,
+    categories: SymbolTable<Category>,
     common_classes: SymbolTable<Common>,
     classes: SymbolTable<Class>,
     roles: SymbolTable<Role>,
+    sensitivities: SymbolTable<Sensitivity>,
     types: SymbolTable<Type>,
+    users: SymbolTable<User>,
 }
 
 pub trait PolicyObject: Sized {
@@ -69,8 +81,36 @@ pub trait PolicyObject: Sized {
 }
 
 impl Policy {
+    pub fn booleans(&self) -> &SymbolTable<Boolean> {
+        &self.booleans
+    }
+
+    pub fn categories(&self) -> &SymbolTable<Category> {
+        &self.categories
+    }
+
     pub fn common_classes(&self) -> &SymbolTable<Common> {
         &self.common_classes
+    }
+
+    pub fn classes(&self) -> &SymbolTable<Class> {
+        &self.classes
+    }
+
+    pub fn roles(&self) -> &SymbolTable<Role> {
+        &self.roles
+    }
+
+    pub fn sensitivities(&self) -> &SymbolTable<Sensitivity> {
+        &self.sensitivities
+    }
+
+    pub fn types(&self) -> &SymbolTable<Type> {
+        &self.types
+    }
+
+    pub fn users(&self) -> &SymbolTable<User> {
+        &self.users
     }
 
     pub fn profile(&self) -> &CompatibilityProfile {

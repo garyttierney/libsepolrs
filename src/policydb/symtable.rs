@@ -36,4 +36,8 @@ impl<SymbolType: Symbol> SymbolTable<SymbolType> {
     pub fn all(&self) -> Values<u32, SymbolType> {
         self.symbols.values()
     }
+
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
 }

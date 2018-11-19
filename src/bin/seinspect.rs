@@ -10,6 +10,8 @@ use sepolrs::policydb::symtable::Symbol;
 use sepolrs::policydb::Policy;
 use sepolrs::policydb::PolicyType;
 
+mod inspect;
+
 fn run_subcommand<Runner>(name: &str, matches: &ArgMatches, policy: &Policy, subcmd_runner: Runner)
 where
     Runner: FnOnce(&Policy, &ArgMatches),
@@ -25,7 +27,9 @@ fn main() {
         (@arg POLICY: -p --policy +takes_value "Override the path to the binary policy file")
         (@subcommand info =>
             (about: "Show high-level policy information")
+            (@arg SHOW_BOOLEANS: --booleans "Show conditional booleans listed in the policy")
             (@arg SHOW_COMMONS: --common "Show common security classes listed in the policy")
+            (@arg SHOW_USERS: --users "Show users listed in the policy")
         )
     );
 
@@ -36,7 +40,6 @@ fn main() {
         .unwrap_or("/sys/fs/selinux/policy");
 
     let policy = sepolrs::load_policy_from_file(policy_path).expect("Unable to parse policy");
-
     match matches.subcommand_name() {
         Some("info") => run_subcommand("info", &matches, &policy, show_policy_info),
         _ => app.print_help().unwrap(),
@@ -44,8 +47,12 @@ fn main() {
 }
 
 fn show_policy_info(policy: &Policy, args: &ArgMatches) {
-    if args.is_present("SHOW_COMMONS") {
+    if args.is_present("SHOW_BOOLEANS") {
+        show_policy_boolean_info(policy);
+    } else if args.is_present("SHOW_COMMONS") {
         show_policy_common_info(&policy)
+    } else if args.is_present("SHOW_USERS") {
+        show_policy_user_info(&policy);
     } else {
         let ty_str = match policy.ty() {
             &PolicyType::Kernel(ref platform) => format!("{:#?} Kernel policy", platform),
@@ -69,6 +76,19 @@ fn show_policy_info(policy: &Policy, args: &ArgMatches) {
 
             println!("Policy capabilities: {}", polcaps_str);
         }
+
+        println!();
+        println!("Classes: {}", policy.classes().len());
+        println!("Roles: {}", policy.roles().len());
+        println!("Users: {}", policy.users().len());
+    }
+}
+
+fn show_policy_user_info(policy: &Policy) {
+    for user in policy.users().all() {
+        println!("User: {}", user.name());
+        println!("\t Default MLS Level: {:#?}", user.default_level());
+        println!("\t MLS Range: {:#?}", user.default_level());
     }
 }
 
@@ -82,5 +102,11 @@ fn show_policy_common_info(policy: &Policy) {
             .join(",\n");
 
         println!("{} {{ \n {} \n}}", common_name, permission_names);
+    }
+}
+
+fn show_policy_boolean_info(policy: &Policy) {
+    for boolean in policy.booleans().all() {
+        println!("{} [{}]", boolean.name(), boolean.is_toggled());
     }
 }

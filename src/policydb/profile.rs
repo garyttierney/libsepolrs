@@ -61,6 +61,9 @@ pub enum Feature {
     BoundaryAlias,
     Mls,
     MlsUsers,
+    TunableSep,
+    AvTab,
+    XpermsIoctl,
 }
 
 impl Feature {
@@ -118,6 +121,12 @@ impl Feature {
             Feature::BoundaryAlias => vec![module_only(MOD_POLICYDB_VERSION_BOUNDARY_ALIAS)],
             Feature::Mls => vec![version(POLICYDB_VERSION_MLS, MOD_POLICYDB_VERSION_MLS)],
             Feature::MlsUsers => vec![module_only(MOD_POLICYDB_VERSION_MLS_USERS)],
+            Feature::TunableSep => vec![module_only(MOD_POLICYDB_VERSION_TUNABLE_SEP)],
+            Feature::AvTab => vec![kernel_only(POLICYDB_VERSION_AVTAB)],
+            Feature::XpermsIoctl => vec![version(
+                POLICYDB_VERSION_XPERMS_IOCTL,
+                MOD_POLICYDB_VERSION_XPERMS_IOCTL,
+            )],
         }
     }
 }

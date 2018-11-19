@@ -2,6 +2,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use croaring::Bitmap;
 use policydb::class::Class;
 use policydb::class::Common;
+use policydb::conditional::Boolean;
 use policydb::cons::constants;
 use policydb::cons::BinaryOp;
 use policydb::cons::Constraint;
@@ -9,6 +10,8 @@ use policydb::cons::ConstraintExpression;
 use policydb::cons::ConstraintExpressionKind;
 use policydb::cons::UnaryOp;
 use policydb::constants::*;
+use policydb::mls::Category;
+use policydb::mls::Sensitivity;
 use policydb::polcap::{PolicyCapability, PolicyCapabilitySet};
 use policydb::profile::CompatibilityProfile;
 use policydb::profile::Feature;
@@ -25,6 +28,7 @@ use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
 use std::str;
+use policydb::avtab::AccessVectorTable;
 
 /// Decodes the policy representation from a binary format.
 pub struct Reader<R: Read> {
@@ -34,11 +38,13 @@ pub struct Reader<R: Read> {
 
 #[derive(Debug)]
 pub enum ReadError {
+    InvalidAccessVectorSpecifier,
     InvalidMagicCode(u32),
     InvalidPolicyCapability,
     InvalidTargetPlatform(String),
     InvalidVersion(u32),
     InputError(IoError),
+    UnsupportedFeatureUsed(Feature),
 }
 
 impl From<IoError> for ReadError {
@@ -62,6 +68,14 @@ impl fmt::Display for ReadError {
 impl<R: Read> Reader<R> {
     pub fn new(buf: R) -> Self {
         Reader { buf, profile: None }
+    }
+
+    pub fn read_u8(&mut self) -> Result<u8, IoError> {
+        self.buf.read_u8()
+    }
+
+    pub fn read_u16(&mut self) -> Result<u16, IoError> {
+        self.buf.read_u16::<LittleEndian>()
     }
 
     pub fn read_u32(&mut self) -> Result<u32, IoError> {
@@ -169,15 +183,25 @@ impl<R: Read> Reader<R> {
         let classes: SymbolTable<Class> = self.read_symbol_table()?;
         let roles: SymbolTable<Role> = self.read_symbol_table()?;
         let types: SymbolTable<Type> = self.read_symbol_table()?;
+        let users: SymbolTable<User> = self.read_symbol_table()?;
+        let booleans: SymbolTable<Boolean> = self.read_symbol_table()?;
+        let sensitivities: SymbolTable<Sensitivity> = self.read_symbol_table()?;
+        let categories: SymbolTable<Category> = self.read_symbol_table()?;
+        let avtab: AccessVectorTable = self.read_object()?;
 
         Ok(Policy {
             version,
             polcaps,
             profile: self.profile.expect("uninitialized"),
+            avtab,
+            booleans,
+            categories,
             common_classes,
             classes,
             roles,
+            sensitivities,
             types,
+            users,
         })
     }
 
