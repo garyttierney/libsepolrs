@@ -1,43 +1,22 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use croaring::Bitmap;
-use policydb::class::Class;
-use policydb::class::Common;
-use policydb::conditional::Boolean;
-use policydb::cons::constants;
-use policydb::cons::BinaryOp;
-use policydb::cons::Constraint;
-use policydb::cons::ConstraintExpression;
-use policydb::cons::ConstraintExpressionKind;
-use policydb::cons::UnaryOp;
-use policydb::constants::*;
-use policydb::mls::Category;
-use policydb::mls::Sensitivity;
-use policydb::polcap::{PolicyCapability, PolicyCapabilitySet};
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::role::Role;
-use policydb::symtable::Symbol;
-use policydb::symtable::SymbolTable;
-use policydb::ty::Type;
-use policydb::ty::TypeSet;
-use policydb::user::User;
-use policydb::PolicyObject;
-use policydb::{Policy, PolicyTargetPlatform, PolicyType};
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
 use std::str;
-use policydb::avtab::AccessVectorTable;
+
+use policydb::constants::*;
+use policydb::*;
 
 /// Decodes the policy representation from a binary format.
-pub struct Reader<R: Read> {
+pub struct PolicyReader<R: Read> {
     buf: R,
     profile: Option<CompatibilityProfile>,
 }
 
 #[derive(Debug)]
-pub enum ReadError {
+pub enum PolicyReadError {
     InvalidAccessVectorSpecifier,
     InvalidMagicCode(u32),
     InvalidPolicyCapability,
@@ -47,27 +26,27 @@ pub enum ReadError {
     UnsupportedFeatureUsed(Feature),
 }
 
-impl From<IoError> for ReadError {
+impl From<IoError> for PolicyReadError {
     fn from(input_error: IoError) -> Self {
-        ReadError::InputError(input_error)
+        PolicyReadError::InputError(input_error)
     }
 }
 
-impl Error for ReadError {
+impl Error for PolicyReadError {
     fn description(&self) -> &str {
         "Something bad happened"
     }
 }
 
-impl fmt::Display for ReadError {
+impl fmt::Display for PolicyReadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Oh no, something bad went down")
     }
 }
 
-impl<R: Read> Reader<R> {
+impl<R: Read> PolicyReader<R> {
     pub fn new(buf: R) -> Self {
-        Reader { buf, profile: None }
+        PolicyReader { buf, profile: None }
     }
 
     pub fn read_u8(&mut self) -> Result<u8, IoError> {
@@ -95,7 +74,10 @@ impl<R: Read> Reader<R> {
         Ok(value)
     }
 
-    pub fn read_bare_symbol_table<S>(&mut self, nel: usize) -> Result<SymbolTable<S>, ReadError>
+    pub fn read_bare_symbol_table<S>(
+        &mut self,
+        nel: usize,
+    ) -> Result<SymbolTable<S>, PolicyReadError>
     where
         S: Symbol,
     {
@@ -108,7 +90,7 @@ impl<R: Read> Reader<R> {
         Ok(table)
     }
 
-    pub fn read_symbol_table<S>(&mut self) -> Result<SymbolTable<S>, ReadError>
+    pub fn read_symbol_table<S>(&mut self) -> Result<SymbolTable<S>, PolicyReadError>
     where
         S: Symbol,
     {
@@ -119,11 +101,14 @@ impl<R: Read> Reader<R> {
         self.read_bare_symbol_table(num_elements as usize)
     }
 
-    pub fn read_object<O: PolicyObject>(&mut self) -> Result<O, ReadError> {
+    pub fn read_object<O: PolicyObject>(&mut self) -> Result<O, PolicyReadError> {
         O::decode(self)
     }
 
-    pub fn read_objects<O: PolicyObject>(&mut self, count: usize) -> Result<Vec<O>, ReadError> {
+    pub fn read_objects<O: PolicyObject>(
+        &mut self,
+        count: usize,
+    ) -> Result<Vec<O>, PolicyReadError> {
         let profile = self.profile();
         let mut list = Vec::with_capacity(count);
 
@@ -134,7 +119,7 @@ impl<R: Read> Reader<R> {
         Ok(list)
     }
 
-    pub fn read_policy(mut self) -> Result<Policy, ReadError> {
+    pub fn read_policy(mut self) -> Result<Policy, PolicyReadError> {
         let ty_opcode = self.read_u32()?;
         let platform_str_len = self.read_u32()?;
         let platform = self.read_string(platform_str_len as usize)?;
@@ -152,7 +137,7 @@ impl<R: Read> Reader<R> {
             SELINUX_MAGIC_NUMBER => PolicyType::Kernel(match platform.as_str() {
                 PLATFORM_SELINUX => PolicyTargetPlatform::SELinux,
                 PLATFORM_XEN => PolicyTargetPlatform::Xen,
-                _ => return Err(ReadError::InvalidTargetPlatform(platform)),
+                _ => return Err(PolicyReadError::InvalidTargetPlatform(platform)),
             }),
             SELINUX_MOD_MAGIC_NUMBER => {
                 let name_len = self.read_u32()?;
@@ -166,7 +151,7 @@ impl<R: Read> Reader<R> {
                     version,
                 }
             }
-            _ => return Err(ReadError::InvalidMagicCode(ty_opcode)),
+            _ => return Err(PolicyReadError::InvalidMagicCode(ty_opcode)),
         };
 
         self.profile = Some(CompatibilityProfile::new(ty, version));

@@ -5,10 +5,10 @@ extern crate sepolrs;
 
 use clap::ArgMatches;
 use itertools::Itertools;
-use sepolrs::policydb::profile::Feature;
-use sepolrs::policydb::symtable::Symbol;
+use sepolrs::policydb::Feature;
 use sepolrs::policydb::Policy;
 use sepolrs::policydb::PolicyType;
+use sepolrs::policydb::Symbol;
 
 mod inspect;
 

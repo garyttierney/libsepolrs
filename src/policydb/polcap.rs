@@ -1,9 +1,9 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
+use policydb::CompatibilityProfile;
+use policydb::Feature;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
 use std::io::Read;
 use std::str::FromStr;
 
@@ -99,7 +99,7 @@ impl PolicyCapabilitySet {
 }
 
 impl PolicyObject for PolicyCapabilitySet {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let profile = reader.profile();
 
         if profile.supports(Feature::PolicyCapabilities) {
@@ -109,7 +109,7 @@ impl PolicyObject for PolicyCapabilitySet {
             for polcap in bitmap.iter().map(|f| PolicyCapability::from_id(f)) {
                 match polcap {
                     Some(p) => polcaps.push(p),
-                    None => return Err(ReadError::InvalidPolicyCapability),
+                    None => return Err(PolicyReadError::InvalidPolicyCapability),
                 }
             }
 

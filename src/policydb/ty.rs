@@ -1,10 +1,10 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
-use policydb::symtable::Symbol;
+use policydb::CompatibilityProfile;
+use policydb::Feature;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::Symbol;
 use std::io::Read;
 
 bitflags! {
@@ -54,7 +54,7 @@ impl Symbol for Type {
 }
 
 impl PolicyObject for Type {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let is_kern_policy = reader.profile().ty().is_kernel_policy();
 
         let name_len = reader.read_u32()? as usize;
@@ -69,7 +69,7 @@ impl PolicyObject for Type {
 
             let flags = TyFlags::empty();
             let properties = TyProperties::from_bits(reader.read_u32()?)
-                .ok_or(ReadError::InvalidPolicyCapability)?;
+                .ok_or(PolicyReadError::InvalidPolicyCapability)?;
 
             let permissive = properties.contains(TyProperties::Permissive);
             let flavor = if properties.contains(TyProperties::Attribute) {
@@ -96,7 +96,8 @@ impl PolicyObject for Type {
             };
 
             let flags = if is_kern_policy {
-                TyFlags::from_bits(reader.read_u32()?).ok_or(ReadError::InvalidPolicyCapability)?
+                TyFlags::from_bits(reader.read_u32()?)
+                    .ok_or(PolicyReadError::InvalidPolicyCapability)?
             } else {
                 TyFlags::empty()
             };
@@ -125,7 +126,7 @@ impl PolicyObject for Type {
 }
 
 impl PolicyObject for TypeSet {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let profile = reader.profile();
 
         if profile.ty().is_kernel_policy() {

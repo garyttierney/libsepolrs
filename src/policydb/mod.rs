@@ -1,32 +1,31 @@
-use policydb::class::Class;
-use policydb::class::Common;
-use policydb::conditional::Boolean;
-use policydb::mls::Category;
-use policydb::mls::Sensitivity;
-use policydb::polcap::PolicyCapabilitySet;
-use policydb::profile::CompatibilityProfile;
-use policydb::reader::ReadError;
-pub use policydb::reader::Reader;
-use policydb::role::Role;
-use policydb::symtable::SymbolTable;
-use policydb::ty::Type;
-use policydb::user::User;
-use std::io::Read;
-use policydb::avtab::AccessVectorTable;
+mod avtab;
+mod bitmap;
+mod class;
+mod conditional;
+mod cons;
+mod mls;
+mod polcap;
+mod profile;
+mod reader;
+mod role;
+mod symtable;
+mod ty;
+mod user;
 
-pub mod avtab;
-pub mod bitmap;
-pub mod class;
-pub mod conditional;
-pub mod cons;
-pub mod mls;
-pub mod polcap;
-pub mod profile;
-pub mod reader;
-pub mod role;
-pub mod symtable;
-pub mod ty;
-pub mod user;
+pub use self::avtab::{
+    AccessVector, AccessVectorTable, AccessVectorTableEntry, AccessVectorTableKey,
+};
+pub use self::class::{Class, Common, Permission};
+pub use self::conditional::Boolean;
+pub use self::cons::{Constraint, ConstraintExpression, ConstraintExpressionKind};
+pub use self::mls::{Category, MlsLevel, MlsRange, Sensitivity};
+pub use self::polcap::{PolicyCapability, PolicyCapabilitySet};
+pub use self::profile::{CompatibilityProfile, Feature};
+pub use self::reader::{PolicyReadError, PolicyReader};
+pub use self::symtable::{Symbol, SymbolTable};
+pub use self::{role::Role, role::RoleSet, ty::Type, ty::TypeSet, user::User};
+
+use std::io::Read;
 
 pub(crate) mod constants {
     pub(crate) const PLATFORM_SELINUX: &str = "SE Linux";
@@ -63,13 +62,13 @@ pub struct Policy {
 }
 
 pub trait PolicyObject: Sized {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError>;
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError>;
 
     fn decode_collection<R: Read>(
-        reader: &mut Reader<R>,
+        reader: &mut PolicyReader<R>,
         profile: &CompatibilityProfile,
         count: usize,
-    ) -> Result<Vec<Self>, ReadError> {
+    ) -> Result<Vec<Self>, PolicyReadError> {
         let mut collection: Vec<Self> = Vec::with_capacity(count);
 
         for _ in 0..count {

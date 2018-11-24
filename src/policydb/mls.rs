@@ -1,9 +1,9 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::reader::ReadError;
-use policydb::symtable::Symbol;
+use policydb::CompatibilityProfile;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::Symbol;
 use std::io::Read;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub struct MlsLevel {
 }
 
 impl PolicyObject for MlsLevel {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let sensitivity = reader.read_u32()?;
         let categories = reader.read_object()?;
 
@@ -25,7 +25,7 @@ impl PolicyObject for MlsLevel {
 }
 
 impl MlsLevel {
-    pub fn decode_expanded<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    pub fn decode_expanded<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let sensitivity = reader.read_u32()?;
         let num_cats = reader.read_u32()?;
         let mut categories = Bitmap::create();
@@ -51,7 +51,7 @@ pub struct MlsRange {
 }
 
 impl PolicyObject for MlsRange {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let items = reader.read_u32()?;
         let s1 = reader.read_u32()?;
         let s2 = if items > 1 { reader.read_u32()? } else { s1 };
@@ -77,7 +77,7 @@ impl PolicyObject for MlsRange {
 }
 
 impl MlsRange {
-    pub fn decode_expanded<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    pub fn decode_expanded<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let low = MlsLevel::decode_expanded(reader)?;
         let high = MlsLevel::decode_expanded(reader)?;
 
@@ -104,7 +104,7 @@ impl Symbol for Sensitivity {
 }
 
 impl PolicyObject for Sensitivity {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()? as usize;
         let is_alias = reader.read_u32()? == 1;
         let name = reader.read_string(name_len)?;
@@ -137,7 +137,7 @@ impl Symbol for Category {
 }
 
 impl PolicyObject for Category {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()? as usize;
         let id = reader.read_u32()?;
         let is_alias = reader.read_u32()? == 1;

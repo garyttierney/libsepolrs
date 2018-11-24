@@ -1,9 +1,9 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::reader::ReadError;
-use policydb::ty::TypeSet;
+use policydb::CompatibilityProfile;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::TypeSet;
 use std::io::Read;
 
 pub(crate) mod constants {
@@ -50,7 +50,7 @@ pub enum ConstraintExpressionKind {
 }
 
 impl PolicyObject for Constraint {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let permissions = reader.read_u32()?;
         let num_exprs = reader.read_u32()? as usize;
         let mut expressions: Vec<ConstraintExpression> = Vec::with_capacity(num_exprs);
@@ -78,7 +78,7 @@ impl PolicyObject for Constraint {
 
                     ConstraintExpressionKind::Names { names, type_names }
                 }
-                _ => return Err(ReadError::InvalidPolicyCapability),
+                _ => return Err(PolicyReadError::InvalidPolicyCapability),
             };
 
             expressions.push(ConstraintExpression { op, attr, kind });

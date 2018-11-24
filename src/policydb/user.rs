@@ -1,12 +1,12 @@
-use policydb::mls::MlsLevel;
-use policydb::mls::MlsRange;
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
-use policydb::role::RoleSet;
-use policydb::symtable::Symbol;
+use policydb::CompatibilityProfile;
+use policydb::Feature;
+use policydb::MlsLevel;
+use policydb::MlsRange;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::RoleSet;
+use policydb::Symbol;
 use std::io::Read;
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl Symbol for User {
 }
 
 impl PolicyObject for User {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()? as usize;
         let id = reader.read_u32()?;
         let bounds = if reader.profile().supports(Feature::Boundary) {

@@ -1,12 +1,12 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
-use policydb::symtable::Symbol;
 use policydb::ty::TypeSet;
+use policydb::CompatibilityProfile;
+use policydb::Feature;
 use policydb::PolicyObject;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
 use policydb::PolicyType;
-use policydb::Reader;
+use policydb::Symbol;
 use std::io::Read;
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub enum RoleSet {
 }
 
 impl PolicyObject for RoleSet {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let profile = reader.profile();
 
         if profile.ty().is_kernel_policy() {
@@ -51,7 +51,7 @@ impl Symbol for Role {
 }
 
 impl PolicyObject for Role {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()? as usize;
         let id = reader.read_u32()?;
 

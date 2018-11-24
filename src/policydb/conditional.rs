@@ -1,8 +1,8 @@
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
-use policydb::symtable::Symbol;
+use policydb::Feature;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::Symbol;
 use std::io::Read;
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ impl Symbol for Boolean {
 }
 
 impl PolicyObject for Boolean {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let id = reader.read_u32()?;
         let state = reader.read_u32()? == 1;
         let name_len = reader.read_u32()? as usize;

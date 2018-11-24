@@ -1,7 +1,7 @@
-use policydb::profile::CompatibilityProfile;
-use policydb::reader::ReadError;
+use policydb::CompatibilityProfile;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
 use std::collections::btree_map::Values;
 use std::collections::BTreeMap;
 use std::io::Read;

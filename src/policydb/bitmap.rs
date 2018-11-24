@@ -1,12 +1,12 @@
 use croaring::Bitmap;
-use policydb::profile::CompatibilityProfile;
-use policydb::reader::ReadError;
+use policydb::CompatibilityProfile;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
 use std::io::Read;
 
 impl PolicyObject for Bitmap {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let map_size = reader.read_u32()?;
         let high_bit = reader.read_u32()?;
         let map_count = reader.read_u32()?;

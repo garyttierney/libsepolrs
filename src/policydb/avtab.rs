@@ -1,7 +1,7 @@
+use policydb::Feature;
 use policydb::PolicyObject;
-use policydb::profile::Feature;
-use policydb::Reader;
-use policydb::reader::ReadError;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
 use std::io::Read;
 
 bitflags! {
@@ -62,7 +62,7 @@ pub struct AccessVectorTableEntry {
 
 #[derive(Debug)]
 pub struct AccessVectorTable {
-    entries: Vec<AccessVectorTableEntry>
+    entries: Vec<AccessVectorTableEntry>,
 }
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ pub enum AccessVector {
 }
 
 impl PolicyObject for AccessVectorTable {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let num_entries = reader.read_u32()? as usize;
         let mut entries: Vec<AccessVectorTableEntry> = Vec::with_capacity(num_entries);
         let is_xavtab_supported = reader.profile().supports(Feature::AvTab);
@@ -115,21 +115,23 @@ impl PolicyObject for AccessVectorTable {
                 let target_type = reader.read_u16()?;
                 let target_class = reader.read_u16()?;
                 let specifier = AccessVectorSpecifier::from_bits(reader.read_u16()?)
-                    .ok_or(ReadError::InvalidAccessVectorSpecifier)?;
+                    .ok_or(PolicyReadError::InvalidAccessVectorSpecifier)?;
                 let matching_specifiers = LEGACY_AV_SPECIFIERS
                     .iter()
                     .filter(|s| specifier.contains(**s))
                     .count();
 
                 if matching_specifiers > 1 {
-                    return Err(ReadError::InvalidAccessVectorSpecifier);
+                    return Err(PolicyReadError::InvalidAccessVectorSpecifier);
                 }
 
                 let ioctls_supported = reader.profile().supports(Feature::XpermsIoctl);
                 let extended_av = specifier.contains(AccessVectorSpecifier::AVTAB_XPERMS);
 
                 let av = if !ioctls_supported && extended_av {
-                    return Err(ReadError::UnsupportedFeatureUsed(Feature::XpermsIoctl));
+                    return Err(PolicyReadError::UnsupportedFeatureUsed(
+                        Feature::XpermsIoctl,
+                    ));
                 } else if extended_av {
                     let specified = reader.read_u8()?;
                     let driver = reader.read_u8()?;

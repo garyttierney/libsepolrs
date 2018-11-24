@@ -1,11 +1,11 @@
-use policydb::cons::Constraint;
-use policydb::profile::CompatibilityProfile;
-use policydb::profile::Feature;
-use policydb::reader::ReadError;
-use policydb::symtable::Symbol;
-use policydb::symtable::SymbolTable;
+use policydb::CompatibilityProfile;
+use policydb::Constraint;
+use policydb::Feature;
 use policydb::PolicyObject;
-use policydb::Reader;
+use policydb::PolicyReadError;
+use policydb::PolicyReader;
+use policydb::Symbol;
+use policydb::SymbolTable;
 use std::io::Read;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl Symbol for Common {
 }
 
 impl PolicyObject for Common {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()?;
         let id = reader.read_u32()?;
         let num_perm_names = reader.read_u32()?;
@@ -50,6 +50,8 @@ impl PolicyObject for Common {
 }
 
 #[derive(Debug)]
+/// A security class type with a collection of permissions that together form an access vector that
+/// may be
 pub struct Class {
     id: u32,
     name: String,
@@ -74,7 +76,7 @@ impl Symbol for Class {
 }
 
 impl PolicyObject for Class {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()?;
         let common_name_len = reader.read_u32()?;
         let id = reader.read_u32()?;
@@ -139,7 +141,7 @@ pub struct Permission {
 }
 
 impl PolicyObject for Permission {
-    fn decode<R: Read>(reader: &mut Reader<R>) -> Result<Self, ReadError> {
+    fn decode<R: Read>(reader: &mut PolicyReader<R>) -> Result<Self, PolicyReadError> {
         let name_len = reader.read_u32()?;
         let id = reader.read_u32()?;
         let name = reader.read_string(name_len as usize)?;
